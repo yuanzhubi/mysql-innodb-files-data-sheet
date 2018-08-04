@@ -16,7 +16,9 @@
 
 注意：
     在frm文件中存储的多字节整数使用小端存储，在本文中出现0001，则表示这是一个2字节整数，低地址字节是00高地址字节是01，所以这个数字是256。如果不特别指出，默认所有整数是无符号类型整数。
-    在frm文件中存储的字符串并不一定使用00结尾，也可能使用ff结尾。
+    
+    在frm文件中存储的字符串并不一定使用00结尾，也可能使用ff结尾。如果不特别指出，默认所有字符串内容没有任何结尾符号。
+    
     test(x) 表示如果x为真则test(x)返回1否则返回0
     
 第一节：.frm类型文件的基本结构
@@ -29,11 +31,11 @@
     5.表的所有字段的信息。
     
 第二节：.frm类型文件中使用到的一些宏常量定义
-   FRM_VER 定义在https://github.com/mysql/mysql-server/blob/4f1d7cf5fcb11a3f84cff27e37100d7295e7d5ca/include/mysql_version.h， 目前是6
+   FRM_VER 定义在https://github.com/mysql/mysql-server/blob/4f1d7cf5fcb11a3f84cff27e37100d7295e7d5ca/include/mysql_version.h  目前是6
    
-   IO_SIZE 定义在https://github.com/mysql/mysql-server/blob/4f1d7cf5fcb11a3f84cff27e37100d7295e7d5ca/include/my_io.h, 能够看到的版本都是4096
+   IO_SIZE 定义在https://github.com/mysql/mysql-server/blob/4f1d7cf5fcb11a3f84cff27e37100d7295e7d5ca/include/my_io.h 能够看到的版本都是4096
    
-   MAX_REF_PARTS 定义在https://github.com/mysql/mysql-server/blob/4f1d7cf5fcb11a3f84cff27e37100d7295e7d5ca/sql/sql_const.h 目前是16，表示联合索引中字段最大数量减1
+   MAX_REF_PARTS 定义在https://github.com/mysql/mysql-server/blob/4f1d7cf5fcb11a3f84cff27e37100d7295e7d5ca/sql/sql_const.h  目前是16，表示联合索引中字段最大数量
   
    NAME_LEN 定义在https://github.com/mysql/mysql-server/blob/4f1d7cf5fcb11a3f84cff27e37100d7295e7d5ca/sql/sql_const.h 目前是NAME_CHAR_LEN * SYSTEM_CHARSET_MBMAXLEN = 64 * 3 = 192
    
@@ -61,30 +63,66 @@
    | 0x0016 | 4     | 表最小行数|  
    | 0x001a | 1     | 未使用|
    | 0x001b | 1     | 只支持按02来解析|
-   | 0x001c | 2     | 索引部分信息长度|
+   | 0x001c | 2     | 索引内容部分信息长度|
    | 0x001e | 2     | HA_OPTION_LONG_BLOB_PTR|
    | 0x0020 | 2     | 主要填0005（mysql5）。如果是0000，那么版本小于3.23，接下来的参数都没用了 |
    | 0x0022 | 4     | 表的平均单行长度，可以用来指示分表或辅助展示|
    | 0x0026 | 1     | 表的默认字符集选项id, 这个id可用值可以从SELECT ID, Collation, Charset FROM INFORMATION_SCHEMA.COLLATIONS 查询 |
    | 0x0027 | 1     | 注释显示计划用作TRANSACTIONAL and PAGE_CHECKSUM clauses of CREATE TABLE，但未实际使用，填0  |
    | 0x0028 | 1     | 行类型ROW_FORMAT参数。<br>参见https://github.com/mysql/mysql-server/blob/4f1d7cf5fcb11a3f84cff27e37100d7295e7d5ca/sql/handler.h 中的row_type选项 |
-   | 0x0029 | 1     | 可以作为高位和0x0026组合成一个2字节整数来获取完整的编码和collation信息。<br>参见https://github.com/mysql/mysql-server/blob/b93c1661d689c8b7decc7563ba15f6ed140a4eb6/sql/table.cc#L1435  |
-   | 0x002a | 2     |  number of pages to sample during stats estimation, if used, otherwise 0.|
-   | 0x002b | 4     |  未使用|
-   | 0x002f | 4     |  索引信息部分最大存储长度key_length的4字节存储形式|
-   | 0x0033 | 4     |  mysql版本号的小端存储，MYSQL_VERSION_ID from include/mysql_version.h <br>	c0c30000=>50112=>5.01.12|
-   | 0x0037 | 4     |  附加信息长度|
-   | 0x003b | 2     |  extra_rec_buf_length, 并未被实际使用的一个字段。多数填0|
-   | 0x003d | 1     |  db默认分区类型，如果非0则表启用了分区表|
-   | 0x003e | 2     |  KEY_BLOCK_SIZE参数|
-   剩余字节用0填充
+   | 0x0029 | 1     | 可以作为高位和0x0026组合成一个2字节整数来获取完整的编码和collation信息。<br>参见https://github.com/mysql/mysql-server/blob/b93c1661d689c8b7decc7563ba15f6ed140a4eb6/sql/table.cc#L1435    |
+   | 0x002a | 1     |  number of pages to sample during stats estimation, if used, otherwise 0. |
+   | 0x002b | 1     |  写死0 |
+   | 0x002c | 1     |  Automatic recalc of stats, 类型为enum_stats_auto_recalc |
+   | 0x002d | 2     |  写死0 |
+   | 0x002f | 4     |  索引信息部分最大存储长度key_length的4字节存储形式 |
+   | 0x0033 | 4     |  mysql版本号的小端存储，MYSQL_VERSION_ID from include/mysql_version.h <br>	c0c30000=>50112=>5.01.12 |
+   | 0x0037 | 4     |  附加信息长度 |
+   | 0x003b | 2     |  extra_rec_buf_length, 并未被实际使用的一个字段。多数填0 |
+   | 0x003d | 1     |  db默认分区类型，如果非0则表启用了分区表 |
+   | 0x003e | 2     |  KEY_BLOCK_SIZE参数 |
+   0x0040-0x1000
    
    
 第四节：表的所有索引的信息  
-    表的所有索引的信息部分从第IO_SIZE(只见过4096)字节开始，而长度则由第0x0e字节处的2字节无符号整数决定如果他不等于0xffff，否则是0x2f处的4字节整数。
+    表的所有索引的信息部分从第IO_SIZE(只见过4096)字节开始，而长度则由第0x0e字节处的2字节无符号整数决定如果他不等于0xffff，否则是0x2f处的4字节整数。设cursor游标是一个指向所在行位置的uint8指针，new_frm_ver=第2字节数-FRM_VER
     
+   | 位置  | 长度  | 解释 |
+   | :--- | :---  |:---- |
+   | 0x1000 | 4 | key_count(有多少个索引), key_parts（索引们的所有字段数量的和）<br>if(cursor[0]<127)key_count = cursor[0], key_parts = cursor[1], cursor[3]=cursor[4]=0<br>else key_count = cursor[0]-128+(cursor[1]%2) * 128, key_parts=((uint16*)cursor)[1]|
+   | 0x1004 | 2 | key_extra_info（扩展信息长度，是本节最后的索引名称和索引注释2个部分数据的总长度）|
+   | 0x1006 | 数组变长 | 索引内容部分信息。每一个数组元素中包含索引内容信息（高版本8字节低版本4字节），接着是这个索引的每一个字段内容信息（高版本9字节低版本7字节），详细代码展开见本节最后|
+   |  |变长| 开头一个ff, 然后是每一个索引的名称，用ff结尾。结束后是一个00。<br>注意即使一个索引也没有，开头的ff和结尾的00都不能省略。|
+   |  |变长| 每一个索引的2字节注释长度和注释内容，没有注释就跳过这个索引而不需要写一个2字节的0|
    
+   注意https://dev.mysql.com/doc/refman/5.6/en/index-extensions.html 所支持的索引自动主键扩展，并不会算到索引的字段数量里去。
    
+   索引内容信息
+   
+   | 名字  | 长度  | 解释 |
+   | :--- | :---  |:---- |
+   | flags | 2 | 注意可以参与https://github.com/mysql/mysql-server/blob/b93c1661d689c8b7decc7563ba15f6ed140a4eb6/include/my_base.h#L459 这里的位运算，低版本只有1字节|
+   | key_length | 2     |  索引长度|
+   | user_defined_key_parts | 1     |  索引字段个数|
+   | algorithm | 1     |  索引算法，老版本是固定的|
+   | block_size | 1     |  建索引的KEY_BLOCK_SIZE，老版本没有|
+   ```c++
+    if (new_frm_ver >= 3) {
+      keyinfo->flags = (uint)uint2korr(strpos) ^ 1;
+      keyinfo->key_length = (uint)uint2korr(strpos + 2);
+      keyinfo->user_defined_key_parts = (uint)strpos[4];
+      keyinfo->algorithm = (enum ha_key_alg)strpos[5];
+      keyinfo->block_size = uint2korr(strpos + 6);
+      strpos += 8;
+    } else {
+      keyinfo->flags = ((uint)strpos[0]) ^ 1;
+      keyinfo->key_length = (uint)uint2korr(strpos + 1);
+      keyinfo->user_defined_key_parts = (uint)strpos[3];
+      // The algorithm was HA_KEY_ALG_UNDEF in 5.7
+      keyinfo->algorithm = HA_KEY_ALG_SE_SPECIFIC;
+      strpos += 4;
+    }
+   ```
    
    
    
