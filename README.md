@@ -1,2 +1,9 @@
-# mysql-innodb-files-data-sheet
-We will try to give a mysql innodb files data sheet, tracking from the old version to the latest.
+# mysql innodb引擎文件datasheet
+
+引言：
+本文将主要介绍mysql innodb引擎下的各种文件的存储格式，并尽力覆盖和追踪一些在旧版本和新版本中的变化。
+
+第一章：.frm类型文件
+
+导语：
+mysql持久化数据存储中最常见的细粒度单元即是：表。一个表的逻辑结构在create语句和alter语句中被定义和修改定义，并且和实际的物理存储引擎无关（无论是用myisam或者inno，你都可以用几乎一致的create语句而唯一的区别在于存储引擎字段的值不同。）。对于表table1, 这个结构信息在过去的mysql版本中存储于table1.frm。 .frm文件作为mysql表逻辑结构的持久化存储文件，在官方网站上并不能找到清晰的和完整的介绍文档(https://dev.mysql.com/doc/internals/en/frm-file-format.html 这个网页的内容并不完整而且还有一些谬误)，很难想象如此重要的文件结构mysql基本靠“源码就是文档”这种模式活到了今天！！事实上笔者在对mysql源码分析中也感觉frm文件格式内部组织非常之混乱(等一下你就可以看到他是如何反人类的区分表和视图的)。还好mysql现在主线的维护人员也感觉这样没法维系下去了，最新版本的mysql已经不再单独创建frm文件。笔者下载了最新的mysql来创建表已经看不到frm文件，git上的源码也不再有create_frm这个函数而只有open_binary_frm这个函数来支持从旧版本数据库的表导入到新版本的库中，具体是从哪一个版本起frm文件消失已经不可考证(https://dev.mysql.com/doc/refman/8.0/en/data-dictionary-file-removal.html 从源码分析上应该早于8.0)。不过目前为止，绝大多数linux操作系统上自带的mysql版本依然建表时会创建.frm信息，这些版本的mysql数据库可以相信仍然会伴随工业界相当长时间，分析.frm文件格式依然是很有意义的一件事情，而且.frm文件不再使用也标志不会有新的逻辑变更，不会有新的历史包袱要兼容，一切都被画上了句号。所以本文即从.frm文件介绍如何从他的内部数据中去分析出一个表的逻辑结构。
