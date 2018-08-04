@@ -106,6 +106,8 @@
    | user_defined_key_parts | 1     |  索引字段个数|
    | algorithm | 1     |  索引算法，老版本是固定的|
    | block_size | 1     |  建索引的KEY_BLOCK_SIZE，老版本没有|
+   |  | 1     |  未使用|
+   
    ```c++
     if (new_frm_ver >= 3) {
       keyinfo->flags = (uint)uint2korr(strpos) ^ 1;
@@ -123,6 +125,36 @@
       strpos += 4;
     }
    ```
+   
+   索引的字段内容信息
+   
+   | 名字  | 长度  | 解释 |
+   | :--- | :---  |:---- |
+   | fieldnr | 2 | Fieldnum in UNIREG|
+   | offset | 2     |  offset in record plus 1|  
+   | key_part_flag | 1     |   0 or HA_REVERSE_SORT，低版本这个字段低7位为索引数据长度，大于127则解析为HA_REVERSE_SORT|
+   | key_type | 2     |  enum ha_base_keytype|
+   | length | 2     |  索引数据长度，所以高版本支持65535长的索引长度而低版本仅支持到127|
+    
+    ```c++
+      key_part->fieldnr=	(uint16) (uint2korr(strpos) & FIELD_NR_MASK);
+      key_part->offset= (uint) uint2korr(strpos+2)-1;
+      key_part->key_type=	(uint) uint2korr(strpos+5);
+      // key_part->field=	(Field*) 0;	// Will be fixed later
+      if (new_frm_ver >= 1){
+	     key_part->key_part_flag= *(strpos+4);
+	     key_part->length=	(uint) uint2korr(strpos+7);
+	     strpos+=9;
+      }else{
+	     key_part->length=	*(strpos+4);
+	     key_part->key_part_flag=0;
+	     if (key_part->length > 128){
+	         key_part->length&=127;		/* purecov: inspected */
+	         key_part->key_part_flag=HA_REVERSE_SORT; /* purecov: inspected */
+	      }
+	     strpos+=7;
+      }
+    ```
    
    
    
