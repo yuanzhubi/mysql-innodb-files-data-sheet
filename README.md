@@ -60,12 +60,12 @@
    | 0x0004 | 2     | 固定写死03. forminfo_length_offset, 表项信息相对64字节的偏移量|
    | 0x0006 | 2     | IO_SIZE宏，能够看到的版本都是4096|
    | 0x0008 | 2     | 固定写死0100|
-   | 0x000a | 4     | 一个计算很复杂的信息，没有看到任何一个版本在解析时使用了这个字段 <br>参见https://github.com/mysql/mysql-server/blob/2c1aab1fe5a17e8804124be22e90f5a598cf7305/sql/table.cc#L3862 可阅读他的计算方法|
+   | 0x000a | 4     | 一个计算很复杂的信息，没有看到任何一个版本在解析时使用了这个字段 <br>参见https://github.com/mysql/mysql-server/blob/2c1aab1fe5a17e8804124be22e90f5a598cf7305/sql/table.cc#L3862 可阅读他的计算方法，应该视作整个文件的最终大小|
    | 0x000e | 2     | 索引信息部分最大存储长度，计算方法如下<br>key_length = keys * (8 + MAX_REF_PARTS * 9 + NAME_LEN + 1) + 16 + key_comment_total_bytes;<br>keys表示有多少个索引<br>key_comment_total_bytes表示有所有索引注释长度加2后的总和<br>如果key_length小于ffff，那么在当前字段存储key_length；否则key_length到0x002f存储，当前字段填ffff|
    | 0x0010 | 2     | 默认值信息部分开头的位图字节长度rec_length|
    | 0x0012 | 4     | 表最大行数|
    | 0x0016 | 4     | 表最小行数|  
-   | 0x001a | 1     | 未使用|
+   | 0x001a | 1     | test((表最大行数 == 1) &&  (表最小行数 == 1) && (索引数量 == 0))|
    | 0x001b | 1     | 只支持按02来解析|
    | 0x001c | 2     | 索引内容部分信息长度|
    | 0x001e | 2     | HA_OPTION_LONG_BLOB_PTR|
@@ -160,9 +160,18 @@
 	     strpos+=7;
       }
     ```
-   第四节：表的扩展信息
+   第四节：默认值信息
+   	
+	注意这个部分应该是从索引字段的开始位置偏移key_length（定义在文件头47字节）后才开始, 此外这个部分长度是在文件头中10处标明。
+	
+	| 名字  | 长度  | 解释 |
+       	| :--- | :---  |:---- |
+       	| null_bitmap | 变长 |如果没有默认值为null的字段，那么长度为1，第一字节为0。<br>否则第一字节最低bit为1，位图长度为(null_column_count + 7 ) / 8 字节<br>从低位到高位，从低字节到高字节标识某个列的默认值是否为null（是null就把比特位置1，注意某列如果是位域类型，则还需要跳过bitsize&7位），最后一个字节多余比特位用1填充。|
+	| 默认值字段 | 变长数组 |非null默认值根据自己的不同类型根据自己的存储方法存储，字符串类型等使用表的默认编码类型进行编码。<br>可阅读https://github.com/mysql/mysql-server/blob/b93c1661d689c8b7decc7563ba15f6ed140a4eb6/sql/field.cc 中不同类型作为Field抽象类的子类去实现各种store方法|
+	
+   第五节：表的扩展信息
       
-       注意这个部分的开始并不一定会紧接上一个部分，而是应该是从索引字段的开始位置偏移key_length（定义在文件头47字节）后才开始。此外以下字段都是可选的，当发现已解析字段长度超过了文件头里的“附加信息长度”，则剩余字段不存在。
+       以下字段都是可选的，当发现已解析字段长度超过了文件头里的“附加信息长度”，则剩余字段不存在。
        
        | 名字  | 长度  | 解释 |
        | :--- | :---  |:---- |
@@ -175,34 +184,59 @@
        | 00|1|字符串结尾信息|
        | auto_partitioned|1|是否自动分区|
        | 索引解析器名字数组 | 数组变长     |每一个索引的解析器名字,00结尾|
-       | table_comment.length | 2 |表的注释信息长度，注意table_comment.length和table_comment需要forminfo第46个字节是255才存在|
+       | table_comment.length | 2 |表的注释信息长度. <br>注意table_comment.length和table_comment需要forminfo第46个字节是255才存在|
        | table_comment |  table_comment.length   | 表的注释长度|
        | table_format_length|2|5.1.20才有的表format信息开始。<br>这里这个长度包含了从&table_format_length开始到column properties的所有字段结束的数据总长度|
        | table_format_flags|4|format标记|
-       | 00|2|未使用|
+       | 0000|2|未使用|
        | tablespace and 00 |字符串变长| 用00结尾的tablespace|
-       | column properties|数组变长|field_storage_type+column_format<<COLUMN_FORMAT_SHIFT组成的数组|
+       | column properties|数组变长|field_storage_type+column_format<<COLUMN_FORMAT_SHIFT组成的数组<br>表format信息到这里结束|
        | compress.length | 2 |压缩算法字符串长度|
        | compress |  compress.length   |  压缩算法字符串内容|  
        | encrypt.length | 2 |加密算法字符串长度|
        | encrypt |  encrypt.length   |  加密算法字符串内容| 
        
        
-   第五节: 表的表单信息（forminfo） 
+   第六节: 表的表单信息（forminfo） 
   
-   	这部分信息主要用来辅助终端展示或者快速展示。这个部分的位置，需要从文件的第64字节偏移forminfo_length_offset个字节再读取4个字节小端整数pos=atoi(file+64+forminfo_length_offset), 注意forminfo_length_offset定义在文件中的第4字节。这个部分的大小固定为288字节。以下位置从forminfo开始算起,有很多没啥大用的字段这里就不做更多的解释，如有疑问可直接参阅https://github.com/mysql/mysql-server/blob/2c1aab1fe5a17e8804124be22e90f5a598cf7305/sql/unireg.cc#L860
+   	这部分信息主要用来辅助。这个部分的位置，需要从文件的第64字节偏移forminfo_length_offset个字节再读取4个字节小端整数pos=*(uint32*)(file+64+forminfo_length_offset), 注意forminfo_length_offset定义在文件中的第4字节。这个部分的大小固定为288字节。以下位置从forminfo开始算起,有很多没啥大用的字段这里就不做更多的解释，如有疑问可直接参阅https://github.com/mysql/mysql-server/blob/2c1aab1fe5a17e8804124be22e90f5a598cf7305/sql/unireg.cc#L860
 	
-	 位置  | 长度  | 解释 |
+	|相对forminfo的位置  | 长度  | 解释 |
    	| :--- | :---  |:---- |
    	| 0x0100 | 1 |  (字段数量-1)/19+1; 参见https://github.com/mysql/mysql-server/blob/2c1aab1fe5a17e8804124be22e90f5a598cf7305/sql/unireg.cc#L552|
    	| 0x0102 | 2     | 表字段数量|
+	| 0x0104 | 2     | 表的screen信息长度|
+	| 0x010a | 2     | 默认值信息部分开头的位图字节长度rec_length|
    	| 0x010e | 2     | 字段内部数量|
    	| 0x0110 | 2     | 字段内部子部分数量|
    	| 0x0112 | 2     | 字段内部总长度| 
 	| 0x0114 | 2     | 时间戳字段位置| 
+	| 0x011a | 2     | null字段个数| 
+	| 0x011c | 2     | 列的评论总字节数| 
 	
 	
-  第六节：表的screen信息(screen_info)
+  第七节：表的screen信息(screen_info)
+  	 
+	 用来展示用的，解析的时候就麻烦用forminfo里的第0x0104的信息来跳过吧。有兴趣就请阅读https://github.com/mysql/mysql-server/blob/2c1aab1fe5a17e8804124be22e90f5a598cf7305/sql/unireg.cc#L537
+	
+  第八节：表的列字段信息
+  
+  	表的每个字段固定占17字节。
+	|相对每个字段开始的偏移  | 长度  | 解释 |
+   	| :--- | :---  |:---- |
+   	| 02 | 1 | 整形字段大小|
+	| 03 | 2 | 字段大小，按照实际编码来设定。例如varchar(4), gbk这里就存2*4，utf8这里就存3*4|
+	| 05 | 3 | 默认值内部存储偏移位置，从1起序，注意这是个3字节无符号整数|
+   	| 08 | 2 | 表字段数量|
+	| 0a | 1 | FRM_context::utype 参见https://github.com/mysql/mysql-server/blob/b93c1661d689c8b7decc7563ba15f6ed140a4eb6/sql/table.h#L3754|
+	| 0b | 1 | chh, 编码类型id高位，字节|
+	| 0c | 1 | interval_nr 类型修正偏移值|
+	| 0d | 1 | 字段类型，参见https://github.com/mysql/mysql-server/blob/4f1d7cf5fcb11a3f84cff27e37100d7295e7d5ca/libbinlogevents/export/binary_log_types.h#L52|
+	| 0e | 1 | 如果字段是地理类型，那么这个字节表示地理类型<br>否则chl,编码类型id低位字节，chl+chh<<8表示编码id|
+	| 0f | 2 | 注释长度|
+	
+  	 
+	 
 	
    	
    
