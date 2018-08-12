@@ -165,8 +165,9 @@
    第四节：默认值信息
    	
   注意这个部分应该是从索引字段的开始位置偏移key_length（定义在文件头47字节）后才开始, 此外这个部分长度是在文件头中10处标明。
+  
 	
-   | 名字  | 长度  | 解释 |
+        | 名字  | 长度  | 解释 |
 	| :--- | :---  |:---- |
 	| null_bitmap | 变长 |如果没有默认值为null的字段，那么长度为1，第一字节为0。<br>否则第一字节最低bit为1，位图长度为(null_column_count + 7 ) / 8 字节<br>从低位到高位，从低字节到高字节标识某个列的默认值是否为null（是null就把比特位置1，注意某列如果是位域类型，则还需要跳过bitsize&7位），最后一个字节多余比特位用1填充。|
 	| 默认值字段 | 变长数组 |非null默认值根据自己的不同类型根据自己的存储方法存储，字符串类型等使用表的默认编码类型进行编码。<br>可阅读https://github.com/mysql/mysql-server/blob/b93c1661d689c8b7decc7563ba15f6ed140a4eb6/sql/field.cc 中不同类型作为Field抽象类的子类去实现各种store方法|
@@ -175,7 +176,7 @@
       
    以下字段都是可选的，当发现已解析字段长度超过了文件头里的“附加信息长度”，则剩余字段不存在。
        
-   | 名字  | 长度  | 解释 |
+        | 名字  | 长度  | 解释 |
 	| :--- | :---  |:---- |
 	| connect_string.length | 2 |连接字符串长度|
 	| connect_string |  connect_string.length   |  连接字符串|  
@@ -204,7 +205,7 @@
    这部分信息主要用来辅助。这个部分的位置，需要从文件的第64字节偏移forminfo_length_offset个字节再读取4个字节小端整数pos=*(uint32*)(file+64+forminfo_length_offset), 注意forminfo_length_offset定义在文件中的第4字节。这个部分的大小固定为288字节。以下位置从forminfo开始算起,有很多没啥大用的字段这里就不做更多的解释，如有疑问可直接参阅https://github.com/mysql/mysql-server/blob/2c1aab1fe5a17e8804124be22e90f5a598cf7305/sql/unireg.cc#L860
 
 
-|相对forminfo的位置  | 长度  | 解释 |
+        |相对forminfo的位置  | 长度  | 解释 |
    	| :--- | :---  |:---- |
    	| 0x0100 | 1 |  (字段数量-1)/19+1; 参见https://github.com/mysql/mysql-server/blob/2c1aab1fe5a17e8804124be22e90f5a598cf7305/sql/unireg.cc#L552|
    	| 0x0102 | 2     | 表字段数量|
@@ -226,7 +227,7 @@
   
  表的每个字段固定占17字节。
  
-|相对每个字段开始的偏移  | 长度  | 解释 |
+        |相对每个字段开始的偏移  | 长度  | 解释 |
    	| :--- | :---  |:---- |
    	| 02 | 1 | 整形字段大小|
 	| 03 | 2 | 字段大小，按照实际编码来设定。例如varchar(4), gbk这里就存2*4，utf8这里就存3*4|
