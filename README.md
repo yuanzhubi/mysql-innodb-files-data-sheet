@@ -106,7 +106,7 @@
    
    | 名字  | 长度  | 解释 |
    | :--- | :---  |:---- |
-   | flags | 2 | 注意可以参与https://github.com/mysql/mysql-server/blob/b93c1661d689c8b7decc7563ba15f6ed140a4eb6/include/my_base.h#L459 这里的位运算，低版本只有1字节|
+   | flags | 2 | 注意可以参见https://github.com/mysql/mysql-server/blob/b93c1661d689c8b7decc7563ba15f6ed140a4eb6/include/my_base.h#L459 这里的位运算，低版本只有1字节|
    | key_length | 2     |  索引长度|
    | user_defined_key_parts | 1     |  索引字段个数|
    | algorithm | 1     |  索引算法，老版本是固定的|
@@ -140,8 +140,9 @@
    | key_part_flag | 1     |   0 or HA_REVERSE_SORT，低版本这个字段低7位为索引数据长度，大于127则解析为HA_REVERSE_SORT|
    | key_type | 2     |  enum ha_base_keytype|
    | length | 2     |  索引数据长度，所以高版本支持65535长的索引长度而低版本仅支持到127|
-    
-    ```c++
+   
+   
+ ```c++
       key_part->fieldnr=	(uint16) (uint2korr(strpos) & FIELD_NR_MASK);
       key_part->offset= (uint) uint2korr(strpos+2)-1;
       key_part->key_type=	(uint) uint2korr(strpos+5);
@@ -164,44 +165,45 @@
    	
 	注意这个部分应该是从索引字段的开始位置偏移key_length（定义在文件头47字节）后才开始, 此外这个部分长度是在文件头中10处标明。
 	
-	| 名字  | 长度  | 解释 |
-       	| :--- | :---  |:---- |
-       	| null_bitmap | 变长 |如果没有默认值为null的字段，那么长度为1，第一字节为0。<br>否则第一字节最低bit为1，位图长度为(null_column_count + 7 ) / 8 字节<br>从低位到高位，从低字节到高字节标识某个列的默认值是否为null（是null就把比特位置1，注意某列如果是位域类型，则还需要跳过bitsize&7位），最后一个字节多余比特位用1填充。|
+| 名字  | 长度  | 解释 |
+	| :--- | :---  |:---- |
+	| null_bitmap | 变长 |如果没有默认值为null的字段，那么长度为1，第一字节为0。<br>否则第一字节最低bit为1，位图长度为(null_column_count + 7 ) / 8 字节<br>从低位到高位，从低字节到高字节标识某个列的默认值是否为null（是null就把比特位置1，注意某列如果是位域类型，则还需要跳过bitsize&7位），最后一个字节多余比特位用1填充。|
 	| 默认值字段 | 变长数组 |非null默认值根据自己的不同类型根据自己的存储方法存储，字符串类型等使用表的默认编码类型进行编码。<br>可阅读https://github.com/mysql/mysql-server/blob/b93c1661d689c8b7decc7563ba15f6ed140a4eb6/sql/field.cc 中不同类型作为Field抽象类的子类去实现各种store方法|
 	
    第五节：表的扩展信息
       
        以下字段都是可选的，当发现已解析字段长度超过了文件头里的“附加信息长度”，则剩余字段不存在。
        
-       | 名字  | 长度  | 解释 |
-       | :--- | :---  |:---- |
-       | connect_string.length | 2 |连接字符串长度|
-       | connect_string |  connect_string.length   |  连接字符串|  
-       | str_db_type.length | 2     |数据库引擎名字长度|
-       | str_db_type| str_db_type.length     |数据库引擎名字|
-       | partition_info_str | 4     |分区信息长度|
-       | partition_info_str | partition_info_str.len     |分区信息|
-       | 00|1|字符串结尾信息|
-       | auto_partitioned|1|是否自动分区|
-       | 索引解析器名字数组 | 数组变长     |每一个索引的解析器名字,00结尾|
-       | table_comment.length | 2 |表的注释信息长度. <br>注意table_comment.length和table_comment需要forminfo第46个字节是255才存在|
-       | table_comment |  table_comment.length   | 表的注释长度|
-       | table_format_length|2|5.1.20才有的表format信息开始。<br>这里这个长度包含了从&table_format_length开始到column properties的所有字段结束的数据总长度|
-       | table_format_flags|4|format标记|
-       | 0000|2|未使用|
-       | tablespace and 00 |字符串变长| 用00结尾的tablespace|
-       | column properties|数组变长|field_storage_type+column_format<<COLUMN_FORMAT_SHIFT组成的数组<br>表format信息到这里结束|
-       | compress.length | 2 |压缩算法字符串长度|
-       | compress |  compress.length   |  压缩算法字符串内容|  
-       | encrypt.length | 2 |加密算法字符串长度|
-       | encrypt |  encrypt.length   |  加密算法字符串内容| 
+   | 名字  | 长度  | 解释 |
+	| :--- | :---  |:---- |
+	| connect_string.length | 2 |连接字符串长度|
+	| connect_string |  connect_string.length   |  连接字符串|  
+	| str_db_type.length | 2     |数据库引擎名字长度|
+	| str_db_type| str_db_type.length     |数据库引擎名字|
+	| partition_info_str | 4     |分区信息长度|
+	| partition_info_str | partition_info_str.len     |分区信息|
+	| 00|1|字符串结尾信息|
+	| auto_partitioned|1|是否自动分区|
+	| 索引解析器名字数组 | 数组变长     |每一个索引的解析器名字,00结尾|
+	| table_comment.length | 2 |表的注释信息长度. <br>注意table_comment.length和table_comment需要forminfo第46个字节是255才存在|
+	| table_comment |  table_comment.length   | 表的注释长度|
+	| table_format_length|2|5.1.20才有的表format信息开始。<br>这里这个长度包含了从&table_format_length开始到column properties的所有字段结束的数据总长度|
+	| table_format_flags|4|format标记|
+	| 0000|2|未使用|
+	| tablespace and 00 |字符串变长| 用00结尾的tablespace|
+	| column properties|数组变长|field_storage_type+column_format<<COLUMN_FORMAT_SHIFT组成的数组<br>表format信息到这里结束|
+	| compress.length | 2 |压缩算法字符串长度|
+	| compress |  compress.length   |  压缩算法字符串内容|  
+	| encrypt.length | 2 |加密算法字符串长度|
+	| encrypt |  encrypt.length   |  加密算法字符串内容| 
        
        
    第六节: 表的表单信息（forminfo） 
   
    	这部分信息主要用来辅助。这个部分的位置，需要从文件的第64字节偏移forminfo_length_offset个字节再读取4个字节小端整数pos=*(uint32*)(file+64+forminfo_length_offset), 注意forminfo_length_offset定义在文件中的第4字节。这个部分的大小固定为288字节。以下位置从forminfo开始算起,有很多没啥大用的字段这里就不做更多的解释，如有疑问可直接参阅https://github.com/mysql/mysql-server/blob/2c1aab1fe5a17e8804124be22e90f5a598cf7305/sql/unireg.cc#L860
-	
-	|相对forminfo的位置  | 长度  | 解释 |
+
+
+|相对forminfo的位置  | 长度  | 解释 |
    	| :--- | :---  |:---- |
    	| 0x0100 | 1 |  (字段数量-1)/19+1; 参见https://github.com/mysql/mysql-server/blob/2c1aab1fe5a17e8804124be22e90f5a598cf7305/sql/unireg.cc#L552|
    	| 0x0102 | 2     | 表字段数量|
@@ -216,13 +218,14 @@
 	
 	
   第七节：表的screen信息(screen_info)
-  	 
-	 用来展示用的，解析的时候就麻烦用forminfo里的第0x0104的信息来跳过吧。有兴趣就请阅读https://github.com/mysql/mysql-server/blob/2c1aab1fe5a17e8804124be22e90f5a598cf7305/sql/unireg.cc#L537
+
+这部分信息主要用来展示用的，解析的时候就麻烦用forminfo里的第0x0104的信息来跳过吧。有兴趣就请阅读https://github.com/mysql/mysql-server/blob/2c1aab1fe5a17e8804124be22e90f5a598cf7305/sql/unireg.cc#L537
 	
   第八节：表的列字段信息
   
-  	表的每个字段固定占17字节。
-	|相对每个字段开始的偏移  | 长度  | 解释 |
+ 表的每个字段固定占17字节。
+ 
+|相对每个字段开始的偏移  | 长度  | 解释 |
    	| :--- | :---  |:---- |
    	| 02 | 1 | 整形字段大小|
 	| 03 | 2 | 字段大小，按照实际编码来设定。例如varchar(4), gbk这里就存2*4，utf8这里就存3*4|
@@ -235,8 +238,6 @@
 	| 0e | 1 | 如果字段是地理类型，那么这个字节表示地理类型<br>否则chl,编码类型id低位字节，chl+chh<<8表示编码id|
 	| 0f | 2 | 注释长度|
 	
-  	 
-	 
-	
-   	
+   接下来是表的所有枚举类型信息。不同枚举类型用00分开，每一个枚举类型的不同值用ff分开。
+   接下来是字段的注释信息。没有分隔符。 
    
