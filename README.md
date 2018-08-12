@@ -221,7 +221,20 @@
 	
   第七节：表的screen信息(screen_info)
 
-这部分信息主要用来展示用的，解析的时候就麻烦用forminfo里的第0x0104的信息来跳过吧。有兴趣就请阅读https://github.com/mysql/mysql-server/blob/2c1aab1fe5a17e8804124be22e90f5a598cf7305/sql/unireg.cc#L537
+这部分信息主要用来展示用的，解析的时候如果不需要就用forminfo里的第0x0104的信息来跳过吧（毕竟里面值按照老式的终端来准备了点信息来供打印，列字段不一定完整）。有兴趣就请阅读https://github.com/mysql/mysql-server/blob/2c1aab1fe5a17e8804124be22e90f5a598cf7305/sql/unireg.cc#L537
+
+```c++
+ start_row=4; end_row=22; cols=80; fields_on_screen=end_row+1-start_row;
+
+  *screens=(fields-1)/fields_on_screen+1;
+  length= (*screens) * (4 + (cols>> 1)+4);
+
+  Create_field *field;
+  while ((field=it++))
+    length+= strlen(field->field_name)+1+3+cols/2;
+```
+  
+  可以看到上算出来了一个需要消耗的内存空间。
 	
   第八节：表的列字段信息
   
@@ -239,7 +252,8 @@
    | 0d | 1 | 字段类型，参见https://github.com/mysql/mysql-server/blob/4f1d7cf5fcb11a3f84cff27e37100d7295e7d5ca/libbinlogevents/export/binary_log_types.h#L52|
    | 0e | 1 | 如果字段是地理类型，那么这个字节表示地理类型<br>否则chl,编码类型id低位字节，chl+chh<<8表示编码id|
    | 0f | 2 | 注释长度|
-	
-   接下来是表的所有枚举类型信息。不同枚举类型用00分开，每一个枚举类型的不同值用ff分开。
+   
+   接下来是表的所有字段名字。用ff分开（开头和结尾都有）。结尾有个00。
+   接下来是表的所有枚举类型信息。每一个枚举类型的不同值用ff分开（开头和结尾都有），不同枚举类型用00分开（结尾也有）。 注意可能不同字段，但是他们的枚举类型是相同的（都是ENUM('RED','GREEN','BLUE')这样定义的，这样会让他们在上面提到的interval_nr会相同），此时这里的枚举类型信息则不会重复。
    接下来是字段的注释信息。没有分隔符。 
    
