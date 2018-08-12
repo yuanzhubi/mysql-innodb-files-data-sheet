@@ -94,7 +94,7 @@
     
    | 位置  | 长度  | 解释 |
    | :--- | :---  |:---- |
-   | 0x1000 | 4 | key_count(有多少个索引), key_parts（索引们的所有字段数量的和）<br>if(cursor[0]<127)key_count = cursor[0], key_parts = cursor[1], cursor[3]=cursor[4]=0<br>else key_count = cursor[0]-128+(cursor[1]%2) * 128, key_parts=((uint16*)cursor)[1]|
+   | 0x1000 | 4 | key_count(有多少个索引), key_parts（索引们的所有字段数量的和）<br>if(cursor[0]<127)key_count = cursor[0], key_parts = cursor[1], cursor[3]=cursor[4]=0<br>else key_count = cursor[0]-128+(cursor[1]%2) * 128, key_parts=((uint16* )cursor)[1]|
    | 0x1004 | 2 | key_extra_info（扩展信息长度，是本节最后的索引名称和索引注释2个部分数据的总长度）|
    | 0x1006 | 数组变长 | 索引内容部分信息。每一个数组元素中包含索引内容信息（高版本8字节低版本4字节），接着是这个索引的每一个字段内容信息（高版本9字节低版本7字节），详细代码展开见本节最后|
    |  |变长| 开头一个ff, 然后是每一个索引的名称，用ff结尾。结束后是一个00。<br>注意即使一个索引也没有，开头的ff和结尾的00都不能省略。|
@@ -146,13 +146,13 @@
       key_part->fieldnr=	(uint16) (uint2korr(strpos) & FIELD_NR_MASK);
       key_part->offset= (uint) uint2korr(strpos+2)-1;
       key_part->key_type=	(uint) uint2korr(strpos+5);
-      // key_part->field=	(Field*) 0;	// Will be fixed later
+      // key_part->field=	(Field* ) 0;	// Will be fixed later
       if (new_frm_ver >= 1){
-	     key_part->key_part_flag= *(strpos+4);
+	     key_part->key_part_flag= * (strpos+4);
 	     key_part->length=	(uint) uint2korr(strpos+7);
 	     strpos+=9;
       }else{
-	     key_part->length=	*(strpos+4);
+	     key_part->length=	* (strpos+4);
 	     key_part->key_part_flag=0;
 	     if (key_part->length > 128){
 	         key_part->length&=127;		/* purecov: inspected */
@@ -202,7 +202,7 @@
        
    第六节: 表的表单信息（forminfo） 
   
-   这部分信息主要用来辅助。这个部分的位置，需要从文件的第64字节偏移forminfo_length_offset个字节再读取4个字节小端整数pos=*(uint32*)(file+64+forminfo_length_offset), 注意forminfo_length_offset定义在文件中的第4字节。这个部分的大小固定为288字节。以下位置从forminfo开始算起,有很多没啥大用的字段这里就不做更多的解释，如有疑问可直接参阅https://github.com/mysql/mysql-server/blob/2c1aab1fe5a17e8804124be22e90f5a598cf7305/sql/unireg.cc#L860
+   这部分信息主要用来辅助。这个部分的位置，需要从文件的第64字节偏移forminfo_length_offset个字节再读取4个字节小端整数pos=* (uint32* )(file+64+forminfo_length_offset), 注意forminfo_length_offset定义在文件中的第4字节。这个部分的大小固定为288字节。以下位置从forminfo开始算起,有很多没啥大用的字段这里就不做更多的解释，如有疑问可直接参阅https://github.com/mysql/mysql-server/blob/2c1aab1fe5a17e8804124be22e90f5a598cf7305/sql/unireg.cc#L860
 
 
    |相对forminfo的位置  | 长度  | 解释 |
@@ -243,7 +243,7 @@
    |相对每个字段开始的偏移  | 长度  | 解释 |
    | :--- | :---  |:---- |
    | 02 | 1 | 整形字段大小|
-   | 03 | 2 | 字段大小，按照实际编码来设定。例如varchar(4), gbk这里就存2*4，utf8这里就存3*4|
+   | 03 | 2 | 字段大小，按照实际编码来设定。例如varchar(4), gbk这里就存2 * 4，utf8这里就存3 * 4|
    | 05 | 3 | 默认值内部存储偏移位置，从1起序，注意这是个3字节无符号整数|
    | 08 | 2 | 表字段数量|
    | 0a | 1 | FRM_context::utype 参见https://github.com/mysql/mysql-server/blob/b93c1661d689c8b7decc7563ba15f6ed140a4eb6/sql/table.h#L3754|
